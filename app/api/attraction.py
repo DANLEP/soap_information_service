@@ -72,24 +72,26 @@ async def get_tags():
     return tags
 
 
-@attraction.post('/{id}/upload_photo', response_model=PhotoOut)
-async def create_upload_file(id: int, file: UploadFile = File(...)):
+@attraction.post('/{id}/photos', response_model=List[PhotoOut])
+async def add_attraction_photos(id: int, files: List[UploadFile] = File(...)):
     if not await db_manager.get_attraction(id):
         raise HTTPException(status_code=404, detail="Attraction not found")
+    photos = []
+    for file in files:
+        file.filename = f"{uuid.uuid4()}.jpg"
 
-    file.filename = f"{uuid.uuid4()}.jpg"
+        public_url = await upload_to_gcs(file)
 
-    public_url = await upload_to_gcs(file)
+        photo_id = await add_photo(id, PhotoIn(url=public_url))
 
-    photo_id = await add_photo(id, PhotoIn(url=public_url))
+        if photo_id:
+            photo = await get_photo(photo_id)
+            photos.append(PhotoOut(id_photo=photo['id_photo'], created_at=photo['created_at'],
+                                   url=f"{google_url}{bucket_name}/photo/{photo['url']}"))
+    return photos
 
-    if photo_id:
-        photo = await get_photo(photo_id)
-        return PhotoOut(id_photo=photo['id_photo'], created_at=photo['created_at'],
-                        url=f"{google_url}{bucket_name}/photo/{photo['url']}")
 
-
-@attraction.delete('/photo/{id_photo}')
+@attraction.delete('/photos/{id_photo}')
 async def delete_photo(id_photo: int):
     photo = await db_manager.get_photo(id_photo)
     if photo:
