@@ -1,14 +1,13 @@
 FROM python:3.10-slim
 
-WORKDIR /app
+WORKDIR /code
 
-COPY ./requirements.txt /app/requirements.txt
+COPY ./requirements.txt /code/requirements.txt
+COPY ./credentials.json /code/credentials.json
 
-RUN apt-get update \
-    && apt-get install gcc -y \
-    && apt-get clean
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-RUN pip install -r /app/requirements.txt \
-    && rm -rf /root/.cache/pip
+COPY ./app /code/app
 
-COPY . /app/
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
